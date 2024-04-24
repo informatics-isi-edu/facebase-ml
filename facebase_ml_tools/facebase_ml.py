@@ -32,7 +32,8 @@ class FaceBaseML(DerivaML):
     - __init__(self, hostname: str = 'ml.facebase.org', catalog_number: str = 'eye-ai'): Initializes the EyeAI object.
     """
 
-    def __init__(self, hostname: str = 'ml.facebase.org', catalog_id: str = 'isa', data_dir: str = './'):
+    def __init__(self, hostname: str = 'ml.facebase.org', catalog_id: str = 'fb-ml',
+                 cache_dir: str='/data', working_dir: str='./'):
         """
         Initializes the FacebaseML object.
 
@@ -41,4 +42,4 @@ class FaceBaseML(DerivaML):
         - catalog_number (str): The catalog number or name.
         """
 
-        super().__init__(hostname, catalog_id, 'isa', data_dir)
+        super().__init__(hostname, catalog_id, 'ml', cache_dir, working_dir)
