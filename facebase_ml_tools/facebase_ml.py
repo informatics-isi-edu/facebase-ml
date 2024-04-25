@@ -7,6 +7,15 @@ from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException
 from pathlib import Path, PurePath
 import os
 
+import tensorflow as tf
+import numpy as np
+import nibabel as nib
+from scipy.ndimage import zoom, rotate
+from tensorflow.image import adjust_brightness
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Dropout
+from tensorflow.keras.callbacks import ModelCheckpoint
+
 # import re
 
 
@@ -34,6 +43,11 @@ class FaceBaseML(DerivaML):
 
     def __init__(self, hostname: str = 'ml.facebase.org', catalog_id: str = 'fb-ml',
                  cache_dir: str='/data', working_dir: str='./'):
+        super().__init__(hostname, catalog_id, 'ml', cache_dir, working_dir)
+        # Initialize the DatasetManager and ModelManager
+        self.dataset_manager = DatasetManager(base_dir=self.working_dir)
+        self.model_manager = ModelManager()
+        
         """
         Initializes the FacebaseML object.
 
@@ -75,3 +89,123 @@ class FaceBaseML(DerivaML):
         # Save the final dataframe to a new CSV file
         final_df.to_csv(output_path, index=False)
         return final_df, output_path
+
+class DatasetManager:
+    def __init__(self, base_dir):
+        self.base_dir = base_dir
+
+    def load_images_and_labels(self, csv_name, folder_name):
+        csv_path = os.path.join(self.base_dir, csv_name)
+        images_folder_path = os.path.join(self.base_dir, folder_name)
+        
+        data = pd.read_csv(csv_path)
+        data['image_path'] = data['Biosample'].apply(lambda x: os.path.join(images_folder_path, f"{x}.mnc"))
+        data = data[data['image_path'].apply(os.path.exists)]
+        
+        if data.empty:
+            print("No image files found.")
+            return [], []
+        
+        data['label'] = data['Experimental_Group'].apply(lambda x: 0 if x == 'Control' else 1)
+        return data['image_path'].tolist(), data['label'].tolist()
+
+    def preprocess_and_augment_image(self, file_path, label, augment_type):
+        image = tf.py_function(func=self.load_process_and_augument_image, inp=[file_path, augment_type], Tout=tf.float32)
+        image.set_shape((256, 256, 256, 1))
+        return image, label
+
+    def load_process_and_augument_image(self, file_path, augment_type):
+        try:
+            # Load image data
+            image = nib.load(file_path.numpy().decode())
+            image_data = image.get_fdata()
+
+            # Downsample and normalize
+            processed_image = self.downsample_and_normalize_image(image_data)
+
+            # Conditional augmentation
+            if augment_type.numpy().decode() == 'rotate':
+                processed_image = self.augment_image_rotate(processed_image)
+            elif augment_type.numpy().decode() == 'brightness':
+                processed_image = self.augment_image_brightness(processed_image)
+
+            return processed_image
+        except Exception as e:
+            print(f"Failed to process file {file_path.numpy().decode()}: {str(e)}")
+            return np.zeros((256, 256, 256, 1), dtype=np.float32)
+
+    def downsample_and_normalize_image(self, image_data, target_shape=(256, 256, 256)):
+        scale_factors = (target_shape[0] / image_data.shape[0], 
+                         target_shape[1] / image_data.shape[1], 
+                         target_shape[2] / image_data.shape[2])
+        resized_image = zoom(image_data, scale_factors, order=1)
+        normalized_image = (resized_image - np.min(resized_image)) / (np.max(resized_image) - np.min(resized_image))
+        normalized_image = normalized_image[..., np.newaxis]
+        return normalized_image.astype(np.float32)
+
+    def augment_image_rotate(self, image_data, angle=10):
+        return rotate(image_data, angle, axes=(0, 1), reshape=False, mode='nearest')
+
+    def augment_image_brightness(self, image_data, delta=0.1):
+        image_tensor = tf.convert_to_tensor(image_data, dtype=tf.float32)
+        brightened_image = adjust_brightness(image_tensor, delta)
+        return brightened_image.numpy()
+
+    def prepare_dataset(self, image_paths, labels, batch_size, shuffle=False, augment_type=None):
+        augment_type = tf.constant(augment_type if augment_type else '')
+        dataset = tf.data.Dataset.from_tensor_slices((image_paths, labels))
+        dataset = dataset.map(lambda x, y: self.preprocess_and_augment_image(x, y, augment_type), num_parallel_calls=tf.data.AUTOTUNE)
+        if shuffle:
+            dataset = dataset.shuffle(buffer_size=len(labels))
+        dataset = dataset.batch(batch_size)
+        return dataset
+
+class ModelManager:
+    def __init__(self):
+        self.model = self.build_3d_cnn_model()
+
+    def build_3d_cnn_model(self):
+        model = Sequential([
+            Conv3D(16, (3, 3, 3), activation='relu', input_shape=(256, 256, 256, 1)),
+            MaxPooling3D((2, 2, 2)),
+            Conv3D(32, (3, 3, 3), activation='relu'),
+            MaxPooling3D((2, 2, 2)),
+            Conv3D(64, (3, 3, 3), activation='relu'),
+            MaxPooling3D((2, 2, 2)),
+            Conv3D(128, (3, 3, 3), activation='relu'),
+            MaxPooling3D((2, 2, 2)),
+            Conv3D(256, (3, 3, 3), activation='relu'),
+            MaxPooling3D((2, 2, 2)),
+            Flatten(),
+            Dense(512, activation='relu'),
+            Dropout(0.1),
+            Dense(1, activation='sigmoid')
+        ])
+        model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+        return model
+
+    def train(self, train_data, validation_data=None, epochs=10, batch_size=32, callbacks=None):
+        self.history = self.model.fit(
+            train_data,
+            validation_data=validation_data,
+            epochs=epochs,
+            batch_size=batch_size,
+            callbacks=callbacks
+        )
+        return self.history
+
+    def save_model(self, filepath, format='tf'):
+        """Saves the model in the specified format ('tf' or 'h5')."""
+        if format == 'h5':
+            filepath += '.h5'  # Ensure the filename ends with '.h5'
+        self.model.save(filepath)
+        print(f"Model saved in {format} format to {filepath}")
+
+    def evaluate(self, test_data):
+        test_loss, test_accuracy = self.model.evaluate(test_data)
+        print(f"Test Loss: {test_loss}, Test Accuracy: {test_accuracy}")
+        return test_loss, test_accuracy
+
+    def predict(self, data):
+        predictions = self.model.predict(data)
+        return predictions
