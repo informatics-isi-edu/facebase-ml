@@ -133,13 +133,10 @@ class FaceBaseML(DerivaML):
         
         
 class DatasetManager:
-    def __init__(self, base_dir):
-        self.base_dir = base_dir
+    def __init__(self):
+        pass
 
-    def load_images_and_labels(self, csv_name, folder_name):
-        csv_path = os.path.join(self.base_dir, csv_name)
-        images_folder_path = os.path.join(self.base_dir, folder_name)
-        
+    def load_images_and_labels(self, csv_path, images_folder_path):
         data = pd.read_csv(csv_path)
         data['image_path'] = data['Biosample'].apply(lambda x: os.path.join(images_folder_path, f"{x}.mnc"))
         data = data[data['image_path'].apply(os.path.exists)]
@@ -152,20 +149,16 @@ class DatasetManager:
         return data['image_path'].tolist(), data['label'].tolist()
 
     def preprocess_and_augment_image(self, file_path, label, augment_type):
-        image = tf.py_function(func=self.load_process_and_augument_image, inp=[file_path, augment_type], Tout=tf.float32)
+        image = tf.py_function(func=self.load_process_and_augment_image, inp=[file_path, augment_type], Tout=tf.float32)
         image.set_shape((256, 256, 256, 1))
         return image, label
 
-    def load_process_and_augument_image(self, file_path, augment_type):
+    def load_process_and_augment_image(self, file_path, augment_type):
         try:
-            # Load image data
             image = nib.load(file_path.numpy().decode())
             image_data = image.get_fdata()
-
-            # Downsample and normalize
             processed_image = self.downsample_and_normalize_image(image_data)
 
-            # Conditional augmentation
             if augment_type.numpy().decode() == 'rotate':
                 processed_image = self.augment_image_rotate(processed_image)
             elif augment_type.numpy().decode() == 'brightness':
@@ -177,9 +170,7 @@ class DatasetManager:
             return np.zeros((256, 256, 256, 1), dtype=np.float32)
 
     def downsample_and_normalize_image(self, image_data, target_shape=(256, 256, 256)):
-        scale_factors = (target_shape[0] / image_data.shape[0], 
-                         target_shape[1] / image_data.shape[1], 
-                         target_shape[2] / image_data.shape[2])
+        scale_factors = (np.array(target_shape) / np.array(image_data.shape))
         resized_image = zoom(image_data, scale_factors, order=1)
         normalized_image = (resized_image - np.min(resized_image)) / (np.max(resized_image) - np.min(resized_image))
         normalized_image = normalized_image[..., np.newaxis]
