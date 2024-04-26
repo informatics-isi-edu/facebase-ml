@@ -52,7 +52,7 @@ class FaceBaseML(DerivaML):
         """
 
         super().__init__(hostname, catalog_id, 'ml', cache_dir, working_dir)
-        self.model = None
+        self.ml_model = None
         
     def join_and_save_csv(self, base_dir, biosample_filename, genotype_filename, output_filename):
         """
@@ -87,7 +87,7 @@ class FaceBaseML(DerivaML):
         return final_df, output_path
         
     def build_3d_cnn_model(self):
-        self.model = Sequential([
+        self.ml_model = Sequential([
             Conv3D(16, (3, 3, 3), activation='relu', input_shape=(256, 256, 256, 1)),
             MaxPooling3D((2, 2, 2)),
             Conv3D(32, (3, 3, 3), activation='relu'),
@@ -103,8 +103,8 @@ class FaceBaseML(DerivaML):
             Dropout(0.1),
             Dense(1, activation='sigmoid')
         ])
-        self.model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
-        return self.model
+        self.ml_model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
+        return self.ml_model
         
         
 class DatasetManager:
