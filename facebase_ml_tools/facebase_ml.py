@@ -103,36 +103,8 @@ class FaceBaseML(DerivaML):
             Dropout(0.1),
             Dense(1, activation='sigmoid')
         ])
-        self.model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
-        return model
-
-    def train(self, train_data, validation_data=None, epochs=10, batch_size=32, callbacks=None):
-        if self.model is None:
-            raise FaceBaseMLException("Model has not been created. Call `build_3d_cnn_model` first.")
-        self.history = self.model.fit(
-            train_data,
-            validation_data=validation_data,
-            epochs=epochs,
-            batch_size=batch_size,
-            callbacks=callbacks
-        )
-        return self.history
-
-    def save_model(self, filepath, format='tf'):
-        """Saves the model in the specified format ('tf' or 'h5')."""
-        if format == 'h5':
-            filepath += '.h5'  # Ensure the filename ends with '.h5'
-        self.model.save(filepath)
-        print(f"Model saved in {format} format to {filepath}")
-
-    def evaluate(self, test_data):
-        test_loss, test_accuracy = self.model.evaluate(test_data)
-        print(f"Test Loss: {test_loss}, Test Accuracy: {test_accuracy}")
-        return test_loss, test_accuracy
-
-    def predict(self, data):
-        predictions = self.model.predict(data)
-        return predictions
+        self.model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
+        return self.model
         
         
 class DatasetManager:
