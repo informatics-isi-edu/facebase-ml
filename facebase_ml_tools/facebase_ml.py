@@ -15,7 +15,7 @@ from tensorflow.image import adjust_brightness
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Dropout
 from tensorflow.keras.callbacks import ModelCheckpoint
-
+from tensorflow.keras.optimizers import Adam
 # import re
 
 
