@@ -42,7 +42,7 @@ class FaceBaseML(DerivaML):
     """
 
     def __init__(self, hostname: str = 'ml.facebase.org', catalog_id: str = 'fb-ml',
-                 cache_dir: str='/data', working_dir: str='./'):
+                 cache_dir: str='/data', working_dir: str='./', base_dir: str = None):
         """
         Initializes the FacebaseML object.
 
@@ -50,8 +50,8 @@ class FaceBaseML(DerivaML):
         - hostname (str): The hostname of the server where the catalog is located.
         - catalog_number (str): The catalog number or name.
         """
-
         super().__init__(hostname, catalog_id, 'ml', cache_dir, working_dir)
+        self.base_dir = base_dir if base_dir else working_dir
         
     def join_and_save_csv(self, base_dir, biosample_filename, genotype_filename, output_filename):
         """
