@@ -142,10 +142,19 @@ class FaceBaseML(DerivaML):
         return brightened_image.numpy()
 
     def prepare_dataset(self, image_paths, labels, batch_size, shuffle=False, augment_type=None):
-        augment_type = tf.constant(augment_type if augment_type else '')
-        dataset = tf.data.Dataset.from_tensor_slices((image_paths, labels))
-        dataset = dataset.map(lambda x, y: self.preprocess_and_augment_image(x, y, augment_type), num_parallel_calls=tf.data.AUTOTUNE)
-        if shuffle:
-            dataset = dataset.shuffle(buffer_size=len(labels))
-        dataset = dataset.batch(batch_size)
-        return dataset
+    augment_type = tf.constant(augment_type if augment_type else '')
+    dataset = tf.data.Dataset.from_tensor_slices((image_paths, labels))
+    
+    # If the dataset fits in memory, cache before preprocessing for faster read access.
+    dataset = dataset.cache()
+    # Map function with parallel processing
+    dataset = dataset.map(
+        lambda x, y: self.preprocess_and_augment_image(x, y, augment_type),
+        num_parallel_calls=tf.data.AUTOTUNE)  # Parallel data loading and processing
+    
+    # Shuffle data (only if needed and with a sufficiently large buffer size)
+    if shuffle:
+        dataset = dataset.shuffle(buffer_size=1000)  # Adjust buffer size based on available memory and dataset size
+    dataset = dataset.batch(batch_size)
+    dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
+    return dataset
