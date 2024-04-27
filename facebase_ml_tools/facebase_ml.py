@@ -154,7 +154,7 @@ class FaceBaseML(DerivaML):
     
     # Shuffle data (only if needed and with a sufficiently large buffer size)
     if shuffle:
-        dataset = dataset.shuffle(buffer_size=1000)  # Adjust buffer size based on available memory and dataset size
+        dataset = dataset.shuffle(buffer_size=3)  # Adjust buffer size based on available memory and dataset size
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
