@@ -54,37 +54,6 @@ class FaceBaseML(DerivaML):
         super().__init__(hostname, catalog_id, 'ml', cache_dir, working_dir)
         self.ml_model = None
         
-    def join_and_save_csv(self, base_dir, biosample_filename, genotype_filename, output_filename):
-        """
-        Joins two CSV files based on specific columns and saves the result to a new file.
-    
-        Parameters:
-        base_dir (str): The base directory path.
-        biosample_filename (str): The filename for the biosample CSV.
-        genotype_filename (str): The filename for the genotype CSV.
-        output_filename (str): The filename to save the joined table.
-        """
-        # Construct full paths for the files
-        biosample_path = os.path.join(base_dir, biosample_filename)
-        genotype_path = os.path.join(base_dir, genotype_filename)
-        output_path = os.path.join(base_dir, output_filename)
-    
-        # Load the CSV files
-        biosample_df = pd.read_csv(biosample_path)
-        genotype_df = pd.read_csv(genotype_path)
-    
-        # Join the tables based on the 'genotype' column of biosample and 'id' column of genotype
-        merged_df = pd.merge(biosample_df, genotype_df, left_on='genotype', right_on='id')
-    
-        # Select and rename the required columns
-        final_df = merged_df[['local_identifier', 'name']]
-        final_df = final_df.rename(columns={'local_identifier':'Biosample','name': 'genotype'})
-
-        final_df['Experimental_Group'] = final_df['genotype'].apply(lambda x: 'Control' if x.endswith('+/+') else 'Experiment')
-
-        # Save the final dataframe to a new CSV file
-        final_df.to_csv(output_path, index=False)
-        return final_df, output_path
         
     def build_3d_cnn_model(self):
         self.ml_model = Sequential([
@@ -106,18 +75,35 @@ class FaceBaseML(DerivaML):
         self.ml_model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
         return self.ml_model
         
+    def join_and_save_csv(self, base_dir, biosample_filename, genotype_filename, output_filename):
+        biosample_path = os.path.join(base_dir, biosample_filename)
+        genotype_path = os.path.join(base_dir, genotype_filename)
+        output_path = os.path.join(base_dir, output_filename)
+
+        biosample_df = pd.read_csv(biosample_path)
+        genotype_df = pd.read_csv(genotype_path)
+
+        merged_df = pd.merge(biosample_df, genotype_df, left_on='genotype', right_on='id')
+        final_df = merged_df[['local_identifier', 'name']]
+        final_df = final_df.rename(columns={'local_identifier': 'Biosample', 'name': 'genotype'})
+
+        # Directly convert genotype to binary labels here
+        final_df['label'] = final_df['genotype'].apply(lambda x: 0 if x.endswith('+/+') else 1)
+        final_df.drop(columns=['genotype'], inplace=True) 
+
+        final_df.to_csv(output_path, index=False)
+        return final_df, output_path
 
     def load_images_and_labels(self, csv_path, images_folder_path):
         data = pd.read_csv(csv_path)
         data['image_path'] = data['Biosample'].apply(lambda x: os.path.join(images_folder_path, f"{x}.mnc"))
         data = data[data['image_path'].apply(os.path.exists)]
-        
+
         if data.empty:
             print("No image files found.")
             return [], []
-        
-        data['label'] = data['Experimental_Group'].apply(lambda x: 0 if x == 'Control' else 1)
-        return data['image_path'].tolist(), data['label'].tolist()
+
+        return data['image_path'].tolist(), data['label'].tolist()     
 
     def preprocess_and_augment_image(self, file_path, label, augment_type):
         image = tf.py_function(func=self.load_process_and_augment_image, inp=[file_path, augment_type], Tout=tf.float32)
