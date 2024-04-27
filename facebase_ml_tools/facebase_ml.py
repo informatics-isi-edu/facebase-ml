@@ -106,10 +106,6 @@ class FaceBaseML(DerivaML):
         self.ml_model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
         return self.ml_model
         
-        
-class DatasetManager:
-    def __init__(self):
-        pass
 
     def load_images_and_labels(self, csv_path, images_folder_path):
         data = pd.read_csv(csv_path)
