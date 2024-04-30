@@ -16,12 +16,15 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Dropout
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
+
+
 # import re
 
 
 class FaceBaseMLException(DerivaMLException):
     def __init__(self, msg=""):
         super().__init__(msg=msg)
+        self.version = sys.modules[globals()["__package__"]].__version__
 
 
 class FaceBaseML(DerivaML):
@@ -42,7 +45,7 @@ class FaceBaseML(DerivaML):
     """
 
     def __init__(self, hostname: str = 'ml.facebase.org', catalog_id: str = 'fb-ml',
-                 cache_dir: str='/data', working_dir: str='./'):
+                 cache_dir: str = '/data', working_dir: str = './'):
         """
         Initializes the FacebaseML object.
 
@@ -53,9 +56,8 @@ class FaceBaseML(DerivaML):
 
         super().__init__(hostname, catalog_id, 'ml', cache_dir, working_dir)
         self.ml_model = None
-        
-        
-    def build_3d_cnn_model(self):
+
+    def build_3d_cnn_model(self):  # In models module
         self.ml_model = Sequential([
             Conv3D(16, (3, 3, 3), activation='relu', input_shape=(256, 256, 256, 1)),
             MaxPooling3D((2, 2, 2)),
@@ -74,7 +76,7 @@ class FaceBaseML(DerivaML):
         ])
         self.ml_model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
         return self.ml_model
-        
+
     def join_and_save_csv(self, base_dir, biosample_filename, genotype_filename, output_filename):
         biosample_path = os.path.join(base_dir, biosample_filename)
         genotype_path = os.path.join(base_dir, genotype_filename)
@@ -89,7 +91,7 @@ class FaceBaseML(DerivaML):
 
         # Directly convert genotype to binary labels here
         final_df['label'] = final_df['genotype'].apply(lambda x: 0 if x.endswith('+/+') else 1)
-        final_df.drop(columns=['genotype'], inplace=True) 
+        final_df.drop(columns=['genotype'], inplace=True)
 
         final_df.to_csv(output_path, index=False)
         return final_df, output_path
@@ -103,7 +105,7 @@ class FaceBaseML(DerivaML):
             print("No image files found.")
             return [], []
 
-        return data['image_path'].tolist(), data['label'].tolist()     
+        return data['image_path'].tolist(), data['label'].tolist()
 
     def preprocess_and_augment_image(self, file_path, label, augment_type):
         image = tf.py_function(func=self.load_process_and_augment_image, inp=[file_path, augment_type], Tout=tf.float32)
@@ -144,14 +146,14 @@ class FaceBaseML(DerivaML):
     def prepare_dataset(self, image_paths, labels, batch_size, shuffle=False, augment_type=None):
         augment_type = tf.constant(augment_type if augment_type else '')
         dataset = tf.data.Dataset.from_tensor_slices((image_paths, labels))
-    
+
         # If the dataset fits in memory, cache before preprocessing for faster read access.
         dataset = dataset.cache()
         # Map function with parallel processing
         dataset = dataset.map(
             lambda x, y: self.preprocess_and_augment_image(x, y, augment_type),
             num_parallel_calls=tf.data.AUTOTUNE)  # Parallel data loading and processing
-    
+
         # Shuffle data (only if needed and with a sufficiently large buffer size)
         if shuffle:
             dataset = dataset.shuffle(buffer_size=300)  # Adjust buffer size based on available memory and dataset size
