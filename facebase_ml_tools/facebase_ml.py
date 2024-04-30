@@ -24,7 +24,6 @@ from tensorflow.keras.optimizers import Adam
 class FaceBaseMLException(DerivaMLException):
     def __init__(self, msg=""):
         super().__init__(msg=msg)
-        self.version = sys.modules[globals()["__package__"]].__version__
 
 
 class FaceBaseML(DerivaML):
@@ -45,7 +44,7 @@ class FaceBaseML(DerivaML):
     """
 
     def __init__(self, hostname: str = 'ml.facebase.org', catalog_id: str = 'fb-ml',
-                 cache_dir: str = '/data', working_dir: str = './'):
+                 cache_dir: str = '/data', working_dir: str = None):
         """
         Initializes the FacebaseML object.
 
@@ -54,7 +53,10 @@ class FaceBaseML(DerivaML):
         - catalog_number (str): The catalog number or name.
         """
 
-        super().__init__(hostname, catalog_id, 'ml', cache_dir, working_dir)
+        super().__init__(hostname, catalog_id, 'ml', 
+                         cache_dir, 
+                         working_dir,
+                         sys.modules[globals()["__package__"]].__version__))
         self.ml_model = None
 
     def build_3d_cnn_model(self):  # In models module
@@ -146,8 +148,17 @@ class FaceBaseML(DerivaML):
     def prepare_dataset(self, image_paths, labels, batch_size, shuffle=False, augment_type=None):
         augment_type = tf.constant(augment_type if augment_type else '')
         dataset = tf.data.Dataset.from_tensor_slices((image_paths, labels))
-        dataset = dataset.map(lambda x, y: self.preprocess_and_augment_image(x, y, augment_type), num_parallel_calls=tf.data.AUTOTUNE)
+
+        # If the dataset fits in memory, cache before preprocessing for faster read access.
+        dataset = dataset.cache()
+        # Map function with parallel processing
+        dataset = dataset.map(
+            lambda x, y: self.preprocess_and_augment_image(x, y, augment_type),
+            num_parallel_calls=tf.data.AUTOTUNE)  # Parallel data loading and processing
+
+        # Shuffle data (only if needed and with a sufficiently large buffer size)
         if shuffle:
-            dataset = dataset.shuffle(buffer_size=len(labels))
+            dataset = dataset.shuffle(buffer_size=3)  # Adjust buffer size based on available memory and dataset size
         dataset = dataset.batch(batch_size)
+        dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
         return dataset
