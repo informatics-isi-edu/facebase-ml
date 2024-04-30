@@ -6,6 +6,7 @@ from PIL import Image
 from deriva_ml.deriva_ml_base import DerivaML, DerivaMLException
 from pathlib import Path, PurePath
 import os
+import sys
 
 import tensorflow as tf
 import numpy as np
