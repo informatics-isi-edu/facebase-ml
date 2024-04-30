@@ -56,7 +56,7 @@ class FaceBaseML(DerivaML):
         super().__init__(hostname, catalog_id, 'ml', 
                          cache_dir, 
                          working_dir,
-                         sys.modules[globals()["__package__"]].__version__))
+                         sys.modules[globals()["__package__"]].__version__)
         self.ml_model = None
 
     def build_3d_cnn_model(self):  # In models module
