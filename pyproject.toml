@@ -4,19 +4,31 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "facebase-ml-tools"
-version = "0.0.1"
 authors = [
     {name = "Your Name", email = "you@yourdomain.com"},
 ]
-description = "Utilities to simplify use of Dervia and Pandas"
+description = "ML code for the FaceBase ML project"
+dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.8"
+dependencies = [
+    "deriva-ml",
+    "pandas",
+    "pillow",
+    "matplotlib",
+    "scikit-learn",
+    "setuptools-git-versioning>=2.0,<3"
+]
+
+[tool.setuptools.package-data]
+# include VERSION file to a package
+eye_ai = ["facebase_ml_tools/VERSION"]
 
 [tool.setuptools-git-versioning]
 enabled = true
-version_file = "VERSION"
+version_file = "facebase_ml_tools/VERSION"
 count_commits_from_version_file = true
 
 [metadata]
 license = "Apache 2.0"
-keywords = ["facebase"]
+keywords = ["facebase", "ml"]
