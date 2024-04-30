@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "facebase-ml"
 authors = [
-    {name = "Your Name", email = "you@yourdomain.com"},
+    {name = "ISI ISRD", email = "isrd-dev@isi.edu"},
 ]
 description = "ML code for the FaceBase ML project"
 dynamic = ["version"]
