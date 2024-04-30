@@ -3,7 +3,7 @@ requires = ["setuptools>=42", "wheel", "setuptools-git-versioning>=2.0,<3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "facebase-ml-tools"
+name = "facebase-ml"
 authors = [
     {name = "Your Name", email = "you@yourdomain.com"},
 ]
@@ -22,11 +22,11 @@ dependencies = [
 
 [tool.setuptools.package-data]
 # include VERSION file to a package
-eye_ai = ["facebase_ml_tools/VERSION"]
+eye_ai = ["facebase_ml/VERSION"]
 
 [tool.setuptools-git-versioning]
 enabled = true
-version_file = "facebase_ml_tools/VERSION"
+version_file = "facebase_ml/VERSION"
 count_commits_from_version_file = true
 
 [metadata]
