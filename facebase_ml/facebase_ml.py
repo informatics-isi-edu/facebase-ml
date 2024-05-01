@@ -62,7 +62,7 @@ class FaceBaseML(DerivaML):
 
     def build_3d_cnn_model(self):  # In models module
         self.ml_model = Sequential([
-            Conv3D(16, (3, 3, 3), activation='relu', input_shape=(256, 256, 256, 1)),
+            Conv3D(16, (3, 3, 3), activation='relu', input_shape=(128, 128, 128, 1)),
             MaxPooling3D((2, 2, 2)),
             Conv3D(32, (3, 3, 3), activation='relu'),
             MaxPooling3D((2, 2, 2)),
@@ -112,7 +112,7 @@ class FaceBaseML(DerivaML):
 
     def preprocess_and_augment_image(self, file_path, label, augment_type):
         image = tf.py_function(func=self.load_process_and_augment_image, inp=[file_path, augment_type], Tout=tf.float32)
-        image.set_shape((256, 256, 256, 1))
+        image.set_shape((128, 128, 128, 1))
         return image, label
 
     def load_process_and_augment_image(self, file_path, augment_type):
@@ -129,9 +129,9 @@ class FaceBaseML(DerivaML):
             return processed_image
         except Exception as e:
             print(f"Failed to process file {file_path.numpy().decode()}: {str(e)}")
-            return np.zeros((256, 256, 256, 1), dtype=np.float32)
+            return np.zeros((128, 128, 128, 1), dtype=np.float32)
 
-    def downsample_and_normalize_image(self, image_data, target_shape=(256, 256, 256)):
+    def downsample_and_normalize_image(self, image_data, target_shape=(128, 128, 128)):
         scale_factors = (np.array(target_shape) / np.array(image_data.shape))
         resized_image = zoom(image_data, scale_factors, order=1)
         normalized_image = (resized_image - np.min(resized_image)) / (np.max(resized_image) - np.min(resized_image))
@@ -151,6 +151,6 @@ class FaceBaseML(DerivaML):
         dataset = tf.data.Dataset.from_tensor_slices((image_paths, labels))
         dataset = dataset.map(lambda x, y: self.preprocess_and_augment_image(x, y, augment_type), num_parallel_calls=tf.data.AUTOTUNE)
         if shuffle:
-            dataset = dataset.shuffle(buffer_size=len(labels))
+            dataset = dataset.shuffle(buffer_size=10)
         dataset = dataset.batch(batch_size)
         return dataset
