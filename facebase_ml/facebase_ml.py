@@ -13,7 +13,8 @@ import numpy as np
 import nibabel as nib
 from scipy.ndimage import zoom, rotate
 from tensorflow.image import adjust_brightness
-from tensorflow.keras.models import Sequential
+from tensorflow.keras import Sequential, Input
+
 from tensorflow.keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Dropout
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
@@ -60,9 +61,12 @@ class FaceBaseML(DerivaML):
                          sys.modules[globals()["__package__"]].__version__)
         self.ml_model = None
 
-    def build_3d_cnn_model(self):  # In models module
+    def build_3d_cnn_model(self):
+        input_shape = (128, 128, 128, 1)
+        
         self.ml_model = Sequential([
-            Conv3D(16, (3, 3, 3), activation='relu', input_shape=(128, 128, 128, 1)),
+            Input(shape=input_shape),
+            Conv3D(16, (3, 3, 3), activation='relu'),
             MaxPooling3D((2, 2, 2)),
             Conv3D(32, (3, 3, 3), activation='relu'),
             MaxPooling3D((2, 2, 2)),
