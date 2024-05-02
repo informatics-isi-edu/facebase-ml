@@ -15,7 +15,6 @@ from scipy.ndimage import zoom, rotate
 from tensorflow.image import adjust_brightness
 from tensorflow.keras import Sequential, Input
 
-from tensorflow.keras.layers import Conv3D, MaxPooling3D, Flatten, Dense, Dropout
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras.optimizers import Adam
 
@@ -59,30 +58,6 @@ class FaceBaseML(DerivaML):
                          cache_dir, 
                          working_dir,
                          sys.modules[globals()["__package__"]].__version__)
-        self.ml_model = None
-
-    def build_3d_cnn_model(self):
-        input_shape = (128, 128, 128, 1)
-        
-        self.ml_model = Sequential([
-            Input(shape=input_shape),
-            Conv3D(16, (3, 3, 3), activation='relu'),
-            MaxPooling3D((2, 2, 2)),
-            Conv3D(32, (3, 3, 3), activation='relu'),
-            MaxPooling3D((2, 2, 2)),
-            Conv3D(64, (3, 3, 3), activation='relu'),
-            MaxPooling3D((2, 2, 2)),
-            Conv3D(128, (3, 3, 3), activation='relu'),
-            MaxPooling3D((2, 2, 2)),
-            Conv3D(256, (3, 3, 3), activation='relu'),
-            MaxPooling3D((2, 2, 2)),
-            Flatten(),
-            Dense(512, activation='relu'),
-            Dropout(0.1),
-            Dense(1, activation='sigmoid')
-        ])
-        self.ml_model.compile(optimizer=Adam(), loss='binary_crossentropy', metrics=['accuracy'])
-        return self.ml_model
 
     def join_and_save_csv(self, base_dir, biosample_filename, genotype_filename, output_filename):
         biosample_path = os.path.join(base_dir, biosample_filename)
