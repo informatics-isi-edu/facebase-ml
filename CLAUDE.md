@@ -123,9 +123,88 @@ uv run load-facebase --hostname localhost --catalog-id 6 --bag-path ~/projects/f
 - Are there labels for brain images (for supervised learning)?
 - How to read/process .mnc format (need nibabel or similar)?
 
-## Next Session Plan (Task 4: Adapt model for FaceBase data)
-- Decide on ML task for FaceBase data (classification, segmentation, shape analysis, etc.)
-- Add nibabel or similar library to read .mnc MINC format files
-- Create model in src/models/ adapted for brain imaging data
-- Create model configs in src/configs/
-- Test full workflow: load data → train → track results in catalog
+## Progress (2026-01-27) - Domain Schema Enhancement
+
+### Task: Add FaceBase Domain Schema
+Per professor's instructions: "Look at the schema in the catalog and the structure of the downloaded bag and add a schema creation function to the load script."
+
+### What Was Done
+
+1. **Analyzed bdbag structure** at `~/projects/facebase-snapshots/dataset_3-JQMG/data/`:
+   - `project.json` - Research project metadata
+   - `experiment.json` - Experiments with types
+   - `biosample.json` - Biological samples (125 records)
+   - `file.json` - File records linking to biosamples
+
+2. **Created `load_facebase.py`** script with `create_domain_schema()` function:
+   - Location: `src/scripts/load_facebase.py`
+   - CLI entry point: `uv run load-facebase`
+
+3. **Domain tables created:**
+   | Table | Type | Description |
+   |-------|------|-------------|
+   | Project | Regular | Research project metadata |
+   | Experiment | Regular | Experiments with type/protocol |
+   | Biosample | Regular | Samples with species, genotype, stage, anatomy |
+   | Scan | Asset | Micro-CT scan files (.mnc) |
+   | Landmark | Asset | Anatomical landmark files (.tag) |
+
+4. **Vocabularies created:**
+   - Species (Mus musculus)
+   - Developmental_Stage (E10.5, E11.5, E14.5, E15.5, E18.5, Adult)
+   - Anatomy (head, face)
+   - Genotype
+   - File_Format (MINC, MNI_TAG)
+
+5. **Applied to Catalog 6** (ml_demo_cc_0122 schema):
+   - Added new tables alongside existing Brain_Image/Landmark
+   - Loaded: 1 project, 6 experiments, 125 biosamples
+   - Created Dataset D9J with 374 members (biosamples + existing images)
+   - URL: https://localhost/chaise/recordset/#6/deriva-ml:Dataset
+
+6. **Created Catalog 7** (facebase schema):
+   - Fresh catalog with "facebase" as domain schema name
+   - All domain tables created from scratch
+   - Loaded: 1 project, 6 experiments, 125 biosamples
+   - Created Dataset 532 with 125 biosample members
+   - URL: https://localhost/chaise/recordset/#7/deriva-ml:Dataset
+
+### Key URLs - Catalog 7 (facebase)
+- **Main:** https://localhost/chaise/recordset/#7/deriva-ml:Dataset
+- **Project:** https://localhost/chaise/recordset/#7/facebase:Project
+- **Experiment:** https://localhost/chaise/recordset/#7/facebase:Experiment
+- **Biosample:** https://localhost/chaise/recordset/#7/facebase:Biosample
+- **Dataset 532:** https://localhost/chaise/record/#7/deriva-ml:Dataset/RID=532
+
+### API Learnings
+- `DerivaML.create_table()` requires `TableDefinition` object, not kwargs
+- Use `TableDefinition(name=..., column_defs=[...])` with `ColumnDefinition` objects
+- `BuiltinTypes.text`, `BuiltinTypes.markdown`, etc. for column types
+- No `ml.insert_records()` - use `ml.pathBuilder.schemas[schema].tables[table].insert(records)`
+- No `ml.update_record()` - use `table.filter(table.RID == rid).update([updates])`
+- `apply_catalog_annotations()` rebuilds navbar dropdown menus
+
+### CLI Usage
+```bash
+# Create schema only (no data)
+uv run load-facebase --hostname localhost --create-catalog facebase_test
+
+# Load into existing catalog
+uv run load-facebase --hostname localhost --catalog-id 6 --bag-path ~/projects/facebase-snapshots/dataset_3-JQMG
+
+# Create new catalog and load data
+uv run load-facebase --hostname localhost --create-catalog facebase --bag-path ~/projects/facebase-snapshots/dataset_3-JQMG
+```
+
+### Sharing Catalogs
+To share localhost catalogs with others on different networks:
+1. **Clone to shared server** (e.g., ml.derivacloud.org)
+2. **Use ngrok tunnel:** `ngrok http https://localhost:443`
+3. **Export as bdbag** and share the file
+4. **Deploy Deriva on cloud VM** with public IP
+
+## Next Steps
+- Upload actual .mnc and .tag files to Catalog 7's Scan/Landmark tables
+- Link Biosample records to their corresponding Scan/Landmark files
+- Consider ML tasks: shape analysis, genotype classification, landmark prediction
+- Add nibabel for .mnc file processing

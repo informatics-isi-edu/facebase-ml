@@ -19,6 +19,7 @@ dependencies = [
 
 [project.scripts]
 load-cifar10 = "scripts.load_cifar10:main"
+load-facebase = "scripts.load_facebase:main"
 
 [dependency-groups]
 dev = [
