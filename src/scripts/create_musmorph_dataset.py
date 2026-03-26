@@ -230,8 +230,12 @@ def main() -> int:
         )
         print(f"  Dataset RID: {dataset.dataset_rid}")
 
+        # Use dict form {table: [rids]} to skip per-RID table resolution,
+        # and validate=False to skip the expensive RID-by-RID lookup.
         print(f"  Adding {len(all_rids)} members...")
-        dataset.add_dataset_members(all_rids)
+        dataset.add_dataset_members(
+            {args.table: all_rids}, validate=False
+        )
         print(f"  Done. Version: {dataset.current_version}")
 
     # Upload any execution output files (logs, etc.) to the catalog.
