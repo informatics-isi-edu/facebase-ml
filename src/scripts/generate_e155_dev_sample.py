@@ -109,7 +109,7 @@ def generate_e155_dev_sample(
     # Nest under parent if specified
     if parent_dataset_rid:
         parent = ml_instance.lookup_dataset(parent_dataset_rid)
-        parent.add_child_dataset(new_dataset.dataset_rid)
+        parent.add_child(new_dataset.dataset_rid)
         print(f"  Nested under parent: {parent_dataset_rid}")
 
     print(f"\nCreated dataset: {new_dataset.dataset_rid}")
