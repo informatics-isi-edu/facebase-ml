@@ -63,3 +63,17 @@ experiment_store(
     ),
     name="cifar10_extended",
 )
+
+# E15.5 dev sample — 100 random files for quick iteration
+experiment_store(
+    make_config(
+        hydra_defaults=[
+            "_self_",
+            {"override /deriva_ml": "dev_facebase"},
+            {"override /script_config": "e155_dev_sample"},
+            {"override /workflow": "dataset_generation"},
+        ],
+        bases=(deriva_model_config,)
+    ),
+    name="e155_dev_sample",
+)

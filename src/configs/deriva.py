@@ -12,3 +12,7 @@ deriva_store(DerivaMLConfig, name="default_deriva",
 deriva_store(DerivaMLConfig, name="eye-ai",
              hostname="www.eye-ai.org",
              catalog_id="eye-ai")
+deriva_store(DerivaMLConfig, name="dev_facebase",
+             hostname="dev.facebase.org",
+             catalog_id="19",
+             use_minid=False)
