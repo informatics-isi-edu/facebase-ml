@@ -108,8 +108,11 @@ def generate_e155_dev_sample(
 
     # Nest under parent if specified
     if parent_dataset_rid:
-        parent = ml_instance.lookup_dataset(parent_dataset_rid)
-        parent.add_child(new_dataset.dataset_rid)
+        dd_table = ml_instance.model.schemas["deriva-ml"].tables["Dataset_Dataset"]
+        dd_table.insert([{
+            "Dataset": parent_dataset_rid,
+            "Nested_Dataset": new_dataset.dataset_rid,
+        }])
         print(f"  Nested under parent: {parent_dataset_rid}")
 
     print(f"\nCreated dataset: {new_dataset.dataset_rid}")
