@@ -17,6 +17,7 @@ E155DevSampleConfig = builds(
     source_version="0.3.0",
     include_tables=["file"],
     element_table="file",
+    exclude_tables=["experiment", "biosample"],
     filter_name="random_sample",
     filter_params={"n": 100, "seed": 42},
     output_description=(

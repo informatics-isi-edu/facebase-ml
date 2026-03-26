@@ -23,6 +23,7 @@ def generate_e155_dev_sample(
     # Denormalization
     include_tables: list[str] | None = None,
     element_table: str = "file",
+    exclude_tables: list[str] | None = None,
     # Feature caching (catalog-query path)
     feature_name: str | None = None,
     # Filter
@@ -75,7 +76,9 @@ def generate_e155_dev_sample(
             version = source_version or dataset.current_version
             print(f"Source: {dataset.description} (RID: {rid}, version: {version})")
 
-            bag = dataset.download_dataset_bag(version=version, materialize=False)
+            bag = dataset.download_dataset_bag(
+                version=version, materialize=False, exclude_tables=exclude_tables
+            )
             df = bag.denormalize_as_dataframe(include_tables)
             print(f"  Denormalized: {len(df)} rows, {len(df.columns)} columns")
             dataframes[rid] = df
