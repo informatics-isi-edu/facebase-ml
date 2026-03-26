@@ -29,3 +29,6 @@ E155DevSampleConfig = builds(
 )
 
 script_store(E155DevSampleConfig, name="e155_dev_sample")
+
+# "none" placeholder — used as default when no script is needed
+script_store(None, name="none")

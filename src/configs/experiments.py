@@ -6,15 +6,14 @@ Use with: uv run deriva-ml-run +experiment=<name>
 Pattern:
 - Group is "experiment" (singular), matching the +experiment= CLI syntax
 - package="_global_" on the store constructor so fields merge at root level
-- Experiments use the primary config class (from model.py) as their base,
-  but we must get a version WITHOUT hydra_defaults to avoid conflicts
+- Use bases=(PrimaryConfig,) for schema validation — PrimaryConfig must NOT
+  have its own hydra_defaults or the base's defaults will shadow yours
+- Set inherited fields to MISSING so Hydra fills them from the defaults list
+  rather than using the base's default values
 """
 
-from hydra_zen import make_config, store
+from hydra_zen import make_config, store, MISSING
 
-# Import the primary config class from our model module.
-# This is the same class used for "deriva_model", ensuring OmegaConf
-# merge validation passes.
 from configs.model import deriva_model as PrimaryConfig
 
 experiment_store = store(group="experiment", package="_global_")
@@ -29,6 +28,9 @@ experiment_store(
             {"override /script_config": "e155_dev_sample"},
             {"override /workflow": "dataset_generation"},
         ],
+        # MISSING tells Hydra to fill from the defaults list, not from
+        # the inherited base's default value
+        script_config=MISSING,
         bases=(PrimaryConfig,),
     ),
     name="e155_dev_sample",
