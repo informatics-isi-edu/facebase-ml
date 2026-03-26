@@ -18,3 +18,6 @@ datasets_store(datasets_training, name="cifar10_training")
 datasets_store(datasets_complete, name="cifar10_complete")
 datasets_store(datasets_training, name="default_dataset")
 
+# Empty dataset list — used by script-only experiments that manage their own data
+datasets_store([], name="none")
+
