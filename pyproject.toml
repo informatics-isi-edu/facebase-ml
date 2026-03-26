@@ -66,7 +66,7 @@ url = "https://download.pytorch.org/whl/cu124"
 explicit = true
 
 [tool.uv.sources]
-deriva-ml = { path = "../deriva-ml", editable = true }
+deriva-ml = { git = "https://github.com/informatics-isi-edu/deriva-ml.git", branch = "main" }
    # torch = [
    #     { index = "pytorch-cpu", marker = "(sys_platform == 'darwin' and platform_machine == 'arm64') or (platform_machine != 'x86_64' and sys_platform == 'Linux')"},
    #     { index = "pytorch-cuda", marker = "sys_platform == 'Linux' and platform_machine == 'x86_64'"}

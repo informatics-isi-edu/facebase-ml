@@ -377,7 +377,8 @@ def insert_records(ml: DerivaML, table_name: str, records: list[dict]) -> list[d
     Returns:
         List of inserted records with RIDs
     """
-    table = ml.pathBuilder.schemas[ml.domain_schema].tables[table_name]
+    pb = ml.pathBuilder()
+    table = pb.schemas[ml.domain_schema].tables[table_name]
     return table.insert(records)
 
 
@@ -390,7 +391,8 @@ def update_record(ml: DerivaML, table_name: str, rid: str, updates: dict) -> Non
         rid: RID of the record to update
         updates: Dictionary of column values to update
     """
-    table = ml.pathBuilder.schemas[ml.domain_schema].tables[table_name]
+    pb = ml.pathBuilder()
+    table = pb.schemas[ml.domain_schema].tables[table_name]
     table.filter(table.RID == rid).update([updates])
 
 
@@ -474,9 +476,11 @@ def load_data_from_bag(
         description="Load FaceBase bdbag data into DerivaML catalog",
     )
 
-    config = ExecutionConfiguration(workflow=workflow)
+    config = ExecutionConfiguration(
+        description="Load FaceBase bdbag data into DerivaML catalog",
+    )
 
-    with ml.create_execution(config) as exe:
+    with ml.create_execution(config, workflow=workflow) as exe:
         logger.info(f"Execution RID: {exe.execution_rid}")
 
         # =====================================================================
@@ -600,40 +604,44 @@ def load_data_from_bag(
         datasets = load_bag_json(bag_path, "dataset.json")
         dataset_info = datasets[0] if datasets else {}
 
-        dataset = ml.create_dataset(
+        # Create dataset through execution for proper provenance tracking
+        dataset = exe.create_dataset(
             description=dataset_info.get("description", "FaceBase imported dataset"),
             dataset_types=["Complete", "FaceBase", "MicroCT"],
         )
 
-        dataset_rid = getattr(dataset, "dataset_rid", dataset)
-        logger.info(f"  Created dataset: {dataset_rid}")
+        logger.info(f"  Created dataset: {dataset.dataset_rid}")
 
-        # Add all biosamples to dataset
-        all_rids = list(biosample_rid_map.values())
+        # Build members grouped by table for dict-form add_dataset_members.
+        # The flat list form triggers expensive per-RID resolution.
+        members_by_table = {}
 
-        # Also add existing image and landmark assets
+        if biosample_rid_map:
+            members_by_table["Biosample"] = list(biosample_rid_map.values())
+
         # Check which asset tables exist (Brain_Image for catalog 6, Scan for catalog 7)
         existing_tables = [t.name for t in ml.model.schemas[ml.domain_schema].tables.values()]
 
         if "Brain_Image" in existing_tables:
             brain_images = ml.list_assets("Brain_Image")
-            all_rids.extend([img["RID"] for img in brain_images])
+            members_by_table["Brain_Image"] = [img["RID"] for img in brain_images]
             results["scans"] = len(brain_images)
         elif "Scan" in existing_tables:
             scans = ml.list_assets("Scan")
-            all_rids.extend([s["RID"] for s in scans])
+            members_by_table["Scan"] = [s["RID"] for s in scans]
             results["scans"] = len(scans)
 
         if "Landmark" in existing_tables:
             landmarks = ml.list_assets("Landmark")
-            all_rids.extend([lm["RID"] for lm in landmarks])
+            members_by_table["Landmark"] = [lm["RID"] for lm in landmarks]
             results["landmarks"] = len(landmarks)
 
-        if all_rids:
-            logger.info(f"  Adding {len(all_rids)} members to dataset...")
-            ml.add_dataset_members(dataset_rid, all_rids, validate=False)
+        total_members = sum(len(v) for v in members_by_table.values())
+        if members_by_table:
+            logger.info(f"  Adding {total_members} members to dataset...")
+            dataset.add_dataset_members(members_by_table, validate=False)
 
-        results["dataset_rid"] = dataset_rid
+        results["dataset_rid"] = dataset.dataset_rid
 
     return results
 
