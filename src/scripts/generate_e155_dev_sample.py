@@ -71,7 +71,8 @@ def generate_e155_dev_sample(
         for rid in source_dataset_rids:
             dataset = ml_instance.lookup_dataset(rid)
             print(f"Source: {dataset.description} (RID: {rid})")
-            members = dataset.list_dataset_members(element_table)
+            all_members = dataset.list_dataset_members()
+            members = all_members.get(element_table, [])
             member_rids = [m["RID"] for m in members]
             print(f"  Members ({element_table}): {len(member_rids)}")
             all_rids.extend(member_rids)
