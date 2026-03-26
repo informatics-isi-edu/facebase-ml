@@ -28,3 +28,13 @@ The MusMorph clone had empty ML vocabulary tables (Asset_Type, Asset_Role, Datas
 ### Data_Management workflow type for bootstrap operations
 
 Used `Data_Management` as the workflow type for the bootstrap script. The standard ML vocabulary includes `Dataset_Management` but this is for the `split_dataset` and subset generation workflows. `Data_Management` is broader — it covers dataset creation, ETL, and general curation operations. The script accepts `--workflow-type` as a CLI argument so it's overridable.
+
+## E15.5 Curated Subset (2026-03-25)
+
+**Decision:** Created E15.5 subset dataset (RID: A9-D272) with 4,858 file members, nested under Complete dataset A9-ANT2.
+
+**Rationale:**
+- First curated subset — filters by developmental stage via file → biosample → vocab.stage join
+- Includes all file types (scans, segmentations, landmarks) at E15.5, not just .mnc images
+- Script is parameterized with --stage-name so it can be reused for other stages (E10.5, E18.5, etc.)
+- Dataset.add_child_dataset() is the correct method, not add_nested_dataset()
