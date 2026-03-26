@@ -42,23 +42,24 @@ from deriva_ml.execution import ExecutionConfiguration
 # Helpers
 # ---------------------------------------------------------------------------
 
-def ensure_workflow_type(
-    ml: DerivaML, type_name: str, description: str
+def ensure_vocab_terms(
+    ml: DerivaML, vocab_table: str, terms: dict[str, str]
 ) -> None:
-    """Create a workflow type if it doesn't already exist.
+    """Ensure vocabulary terms exist, creating any that are missing.
 
-    Catalog clones may not have all vocabulary terms from the source catalog,
-    so we check and create before attempting to use the type.
+    Catalog clones may not have all vocabulary terms from the source catalog.
+    Always call this before using terms in create_dataset, create_workflow, etc.
 
     Args:
         ml: Connected DerivaML instance.
-        type_name: Workflow type name to ensure exists.
-        description: Description if the type needs to be created.
+        vocab_table: Vocabulary table name (e.g., "Workflow_Type", "Dataset_Type").
+        terms: Dict mapping term name to description for each required term.
     """
-    existing = {t.name for t in ml.list_vocabulary_terms("Workflow_Type")}
-    if type_name not in existing:
-        print(f"  Creating workflow type: {type_name}")
-        ml.add_term("Workflow_Type", type_name, description)
+    existing = {t.name for t in ml.list_vocabulary_terms(vocab_table)}
+    for name, description in terms.items():
+        if name not in existing:
+            print(f"  Creating {vocab_table} term: {name}")
+            ml.add_term(vocab_table, name, description)
 
 
 def query_all_rids(ml: DerivaML, schema: str, table: str) -> list[str]:
@@ -188,13 +189,14 @@ def main() -> int:
         return 0
 
     # -----------------------------------------------------------------------
-    # 4. Ensure prerequisites
+    # 4. Ensure prerequisites — vocab terms may be missing in cloned catalogs
     # -----------------------------------------------------------------------
-    ensure_workflow_type(
-        ml,
-        args.workflow_type,
-        "Catalog data management operations (dataset creation, ETL, curation)",
-    )
+    ensure_vocab_terms(ml, "Workflow_Type", {
+        args.workflow_type: "Catalog data management operations (dataset creation, ETL, curation)",
+    })
+    ensure_vocab_terms(ml, "Dataset_Type", {
+        "Complete": "A dataset containing all available records of a given type.",
+    })
 
     # -----------------------------------------------------------------------
     # 5. Create workflow and execution for provenance tracking
