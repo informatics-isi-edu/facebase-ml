@@ -60,6 +60,7 @@ def run_model(
     description: str,
     workflow: Workflow,
     model_config: Any,
+    script_config: Any = None,
     dry_run: bool = False,
 ) -> None:
     """
@@ -180,7 +181,8 @@ def run_model(
             # hydra-zen wrapped function that has been partially configured with
             # all model-specific parameters (e.g., learning rate, batch size).
             # We provide the runtime context here.
-            model_config(ml_instance=ml_instance, execution=exec_context)
+            callable_config = script_config if script_config is not None else model_config
+            callable_config(ml_instance=ml_instance, execution=exec_context)
 
     # ---------------------------------------------------------------------------
     # Upload results to the catalog
@@ -219,6 +221,7 @@ deriva_model = builds(
         {"assets": "default_asset"},           # Asset RIDs
         {"workflow": "default_workflow"},      # Workflow definition
         {"model_config": "default_model"},     # Model configuration
+        {"optional script_config": "none"},    # Optional script override
     ],
 )
 

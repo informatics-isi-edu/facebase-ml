@@ -43,6 +43,16 @@ Train a 2-layer convolutional neural network on CIFAR-10 image data.
 )
 
 
+# Dataset generation workflow — for skill-generated subset scripts
+DatasetGenerationWorkflow = builds(
+    Workflow,
+    name="Dataset Generation",
+    workflow_type="Dataset_Generation",
+    description="Create curated dataset subsets via filter-based selection.",
+    populate_full_signature=True,
+)
+
+
 # ---------------------------------------------------------------------------
 # Register with Hydra-Zen Store
 # ---------------------------------------------------------------------------
@@ -50,3 +60,4 @@ Train a 2-layer convolutional neural network on CIFAR-10 image data.
 workflow_store = store(group="workflow")
 workflow_store(Cifar10CNNWorkflow, name="default_workflow")
 workflow_store(Cifar10CNNWorkflow, name="cifar10_cnn")
+workflow_store(DatasetGenerationWorkflow, name="dataset_generation")
