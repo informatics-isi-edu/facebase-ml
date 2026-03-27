@@ -1,40 +1,37 @@
 """Filter Registry for Dataset Subset Generation.
 
-Provides common filter implementations for selecting records from
-denormalized DataFrames. Each filter takes a dict of DataFrames
-(keyed by source dataset RID) and returns selected RIDs with a
-description of the selection.
+Provides common filter implementations for selecting records from datasets.
+Filters declare whether they need denormalized data (requires_data=True)
+or can work from just a list of member RIDs (requires_data=False).
+
+- requires_data=False: The script uses list_dataset_members() directly.
+  Fast, no bag download. Use for random sampling, all_records, etc.
+- requires_data=True: The script downloads a metadata-only bag and
+  denormalizes into DataFrames. Use for value-based filtering.
 
 Custom filters can be registered with @register_filter("name") and
 referenced by name in hydra configs via filter_name parameter.
 
 Built-in filters:
-  - all_records: All records from the element table (no filtering)
-  - has_feature: Records that have a non-null value for a feature column
-  - feature_equals: Records where a feature column matches a specific value
-  - feature_in: Records where a feature column is in a list of values
-  - numeric_range: Records where a numeric column is within bounds
+  - random_sample: Random sample of n records (requires_data=False)
+  - all_records: All records from the element table (requires_data=False)
+  - has_feature: Records with a non-null feature value (requires_data=True)
+  - feature_equals: Records matching a specific value (requires_data=True)
+  - feature_in: Records matching any of several values (requires_data=True)
+  - numeric_range: Records within numeric bounds (requires_data=True)
 """
 
 from __future__ import annotations
 
+import random
+from dataclasses import dataclass, field
 from typing import Protocol
 
 import pandas as pd
 
 
-class FilterFunction(Protocol):
-    """Protocol for filter functions.
-
-    Args:
-        dataframes: Dict mapping source dataset RID to its denormalized DataFrame.
-            For single-source subsets, this has one entry.
-        element_table: Table whose RIDs are collected for the new dataset.
-        **kwargs: Filter-specific parameters from filter_params config.
-
-    Returns:
-        Tuple of (list of selected RIDs, human-readable description of selection).
-    """
+class DataFilterFunction(Protocol):
+    """Protocol for filters that need denormalized DataFrames."""
 
     def __call__(
         self,
@@ -45,18 +42,42 @@ class FilterFunction(Protocol):
     ) -> tuple[list[str], str]: ...
 
 
-FILTER_REGISTRY: dict[str, FilterFunction] = {}
+class MemberFilterFunction(Protocol):
+    """Protocol for filters that only need a list of RIDs."""
+
+    def __call__(
+        self,
+        member_rids: list[str],
+        **kwargs,
+    ) -> tuple[list[str], str]: ...
 
 
-def register_filter(name: str):
-    """Decorator to register a filter function by name."""
+@dataclass
+class FilterEntry:
+    """A registered filter with metadata."""
+    fn: DataFilterFunction | MemberFilterFunction
+    requires_data: bool
+    name: str = ""
+
+
+FILTER_REGISTRY: dict[str, FilterEntry] = {}
+
+
+def register_filter(name: str, *, requires_data: bool = True):
+    """Decorator to register a filter function by name.
+
+    Args:
+        name: Lookup name for the filter.
+        requires_data: If False, the filter only needs member RIDs (fast path).
+            If True, the filter needs denormalized DataFrames (bag download).
+    """
     def decorator(fn):
-        FILTER_REGISTRY[name] = fn
+        FILTER_REGISTRY[name] = FilterEntry(fn=fn, requires_data=requires_data, name=name)
         return fn
     return decorator
 
 
-def get_filter(name: str) -> FilterFunction:
+def get_filter(name: str) -> FilterEntry:
     """Look up a registered filter by name with a helpful error message."""
     if name not in FILTER_REGISTRY:
         available = ", ".join(sorted(FILTER_REGISTRY.keys()))
@@ -65,7 +86,7 @@ def get_filter(name: str) -> FilterFunction:
 
 
 # =============================================================================
-# Shared helpers
+# Shared helpers (for data-requiring filters)
 # =============================================================================
 
 
@@ -73,12 +94,7 @@ def _merge_dataframes(
     dataframes: dict[str, pd.DataFrame],
     element_table: str,
 ) -> pd.DataFrame:
-    """Concatenate source DataFrames and validate the RID column exists.
-
-    Raises:
-        ValueError: If no source DataFrames are provided.
-        KeyError: If the expected RID column is missing.
-    """
+    """Concatenate source DataFrames and validate the RID column exists."""
     if not dataframes:
         raise ValueError("No source DataFrames provided — source_dataset_rids may be empty")
     df = pd.concat(dataframes.values(), ignore_index=True)
@@ -98,11 +114,7 @@ def _extract_rids(df: pd.DataFrame, element_table: str) -> list[str]:
 
 
 def _validate_column(df: pd.DataFrame, column: str) -> None:
-    """Validate that a column exists in the DataFrame.
-
-    Raises:
-        KeyError: If the column is not present, with a list of available columns.
-    """
+    """Validate that a column exists in the DataFrame."""
     if column not in df.columns:
         available = sorted(c for c in df.columns if not c.startswith("_"))
         raise KeyError(
@@ -112,30 +124,53 @@ def _validate_column(df: pd.DataFrame, column: str) -> None:
 
 
 # =============================================================================
-# Built-in filters
+# Member-only filters (requires_data=False — fast path, no bag download)
 # =============================================================================
 
 
-@register_filter("all_records")
-def all_records(
-    dataframes: dict[str, pd.DataFrame],
+@register_filter("random_sample", requires_data=False)
+def random_sample(
+    member_rids: list[str],
     *,
-    element_table: str,
+    n: int = 100,
+    seed: int = 42,
     **kwargs,
 ) -> tuple[list[str], str]:
-    """Select all records from the element table — no filtering.
+    """Select a random sample of n records.
 
-    Use this to create a dataset containing every record in a table.
-    The subset template treats this as a pass-through filter.
+    Use this for creating small development/iteration datasets.
+    The seed ensures reproducibility.
     """
-    df = _merge_dataframes(dataframes, element_table)
-    rids = _extract_rids(df, element_table)
+    if n >= len(member_rids):
+        desc = f"Requested {n} but only {len(member_rids)} available — returning all"
+        return member_rids, desc
 
-    desc = f"Selected all {len(rids)} records from {element_table}"
-    return rids, desc
+    rng = random.Random(seed)
+    sampled = rng.sample(member_rids, n)
+
+    desc = f"Randomly sampled {len(sampled)} of {len(member_rids)} records (seed={seed})"
+    return sampled, desc
 
 
-@register_filter("has_feature")
+@register_filter("all_records", requires_data=False)
+def all_records(
+    member_rids: list[str],
+    **kwargs,
+) -> tuple[list[str], str]:
+    """Select all records — no filtering.
+
+    Use this to create a dataset containing every member of the source.
+    """
+    desc = f"Selected all {len(member_rids)} records"
+    return member_rids, desc
+
+
+# =============================================================================
+# Data-requiring filters (requires_data=True — bag download path)
+# =============================================================================
+
+
+@register_filter("has_feature", requires_data=True)
 def has_feature(
     dataframes: dict[str, pd.DataFrame],
     *,
@@ -143,12 +178,7 @@ def has_feature(
     column: str,
     **kwargs,
 ) -> tuple[list[str], str]:
-    """Select records that have a non-null value for a feature column.
-
-    Use this to build datasets of labeled records from a larger set that
-    may contain unlabeled data. For example, selecting all images that
-    have an Image_Class label.
-    """
+    """Select records that have a non-null value for a feature column."""
     df = _merge_dataframes(dataframes, element_table)
     _validate_column(df, column)
     selected = df[df[column].notna()]
@@ -159,7 +189,7 @@ def has_feature(
     return rids, desc
 
 
-@register_filter("feature_equals")
+@register_filter("feature_equals", requires_data=True)
 def feature_equals(
     dataframes: dict[str, pd.DataFrame],
     *,
@@ -178,7 +208,7 @@ def feature_equals(
     return rids, desc
 
 
-@register_filter("feature_in")
+@register_filter("feature_in", requires_data=True)
 def feature_in(
     dataframes: dict[str, pd.DataFrame],
     *,
@@ -201,7 +231,7 @@ def feature_in(
     return rids, desc
 
 
-@register_filter("numeric_range")
+@register_filter("numeric_range", requires_data=True)
 def numeric_range(
     dataframes: dict[str, pd.DataFrame],
     *,
@@ -211,10 +241,7 @@ def numeric_range(
     max_val: float | None = None,
     **kwargs,
 ) -> tuple[list[str], str]:
-    """Select records where a numeric column is within bounds.
-
-    At least one of min_val or max_val must be specified.
-    """
+    """Select records where a numeric column is within bounds."""
     if min_val is None and max_val is None:
         raise ValueError(
             "numeric_range requires at least one of min_val or max_val. "
@@ -241,32 +268,3 @@ def numeric_range(
         bounds.append(f"<= {max_val}")
     desc = f"Selected {len(rids)} records where {column} {' and '.join(bounds)}"
     return rids, desc
-
-
-@register_filter("random_sample")
-def random_sample(
-    dataframes: dict[str, pd.DataFrame],
-    *,
-    element_table: str,
-    n: int = 100,
-    seed: int = 42,
-    **kwargs,
-) -> tuple[list[str], str]:
-    """Select a random sample of n records from the element table.
-
-    Use this for creating small development/iteration datasets.
-    The seed ensures reproducibility.
-    """
-    df = _merge_dataframes(dataframes, element_table)
-    rids = _extract_rids(df, element_table)
-
-    if n >= len(rids):
-        desc = f"Requested {n} but only {len(rids)} available — returning all"
-        return rids, desc
-
-    import random
-    rng = random.Random(seed)
-    sampled = rng.sample(rids, n)
-
-    desc = f"Randomly sampled {len(sampled)} of {len(rids)} records (seed={seed})"
-    return sampled, desc
