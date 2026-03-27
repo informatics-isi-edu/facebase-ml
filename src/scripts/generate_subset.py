@@ -1,12 +1,12 @@
-"""Generate a 100-element random sample from the E15.5 subset.
+"""Generate a dataset subset by filtering a source dataset.
 
 For filters with requires_data=False (like random_sample), we list dataset
 members directly from the catalog — no bag download needed. For filters with
 requires_data=True, we download a metadata-only bag and denormalize.
 
 Run via:
-    uv run deriva-ml-run +experiment=e155_dev_sample dry_run=true
-    uv run deriva-ml-run +experiment=e155_dev_sample
+    uv run deriva-ml-run +experiment=<experiment_name> dry_run=true
+    uv run deriva-ml-run +experiment=<experiment_name>
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from deriva_ml.feature import FeatureRecord
 from scripts.subset_filters import get_filter
 
 
-def generate_e155_dev_sample(
+def generate_subset(
     # Source datasets
     source_dataset_rids: list[str] | None = None,
     source_version: str | None = None,

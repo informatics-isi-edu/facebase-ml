@@ -28,10 +28,40 @@ experiment_store(
             {"override /script_config": "e155_dev_sample"},
             {"override /workflow": "dataset_generation"},
         ],
-        # MISSING tells Hydra to fill from the defaults list, not from
-        # the inherited base's default value
         script_config=MISSING,
         bases=(PrimaryConfig,),
     ),
     name="e155_dev_sample",
+)
+
+# E15.5 training sample — 200 random files for training experiments
+experiment_store(
+    make_config(
+        hydra_defaults=[
+            "_self_",
+            {"override /deriva_ml": "dev_facebase"},
+            {"override /datasets": "none"},
+            {"override /script_config": "e155_training_sample"},
+            {"override /workflow": "dataset_generation"},
+        ],
+        script_config=MISSING,
+        bases=(PrimaryConfig,),
+    ),
+    name="e155_training_sample",
+)
+
+# Annotate Phenotype — classify genotypes on E15.5 dataset
+experiment_store(
+    make_config(
+        hydra_defaults=[
+            "_self_",
+            {"override /deriva_ml": "dev_facebase"},
+            {"override /datasets": "none"},
+            {"override /script_config": "annotate_phenotype"},
+            {"override /workflow": "dataset_generation"},
+        ],
+        script_config=MISSING,
+        bases=(PrimaryConfig,),
+    ),
+    name="annotate_phenotype_e155",
 )
