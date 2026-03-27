@@ -25,6 +25,31 @@ docker compose --env-file ~/.deriva-docker/env/localhost.env stop  # Stop stack
 
 **Default test credentials:** deriva-admin/deriva-admin, deriva/deriva
 
+### ~/GitHub/deriva-skills
+**Purpose:** Claude Code skills/plugins for DerivaML workflows
+
+**What it does:**
+- Skills for dataset lifecycle, experiment config, feature creation, catalog operations
+- Installed as a Claude Code plugin (marketplace name: `deriva-plugins`)
+
+**IMPORTANT:** Always edit skill files here, NEVER in the plugin cache (`~/.claude/plugins/cache/`). The cache is ephemeral.
+
+**Key commands:**
+```bash
+cd ~/GitHub/deriva-skills
+# Edit skills in skills/<skill-name>/SKILL.md
+# Bump version after changes:
+uv run bump-version patch   # auto-commits, tags, and pushes
+```
+
+### ~/GitHub/deriva-ml-model-template
+**Purpose:** GitHub template for new DerivaML model projects
+
+**What it does:**
+- Template repository users clone to start new ML projects
+- Pre-configured with Hydra/hydra-zen, example CIFAR-10 model
+- Changes here affect all new projects created from the template
+
 ### ~/projects/deriva-ml
 **Purpose:** DerivaML Python library (core library)
 

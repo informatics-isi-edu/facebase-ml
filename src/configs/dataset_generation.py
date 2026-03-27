@@ -63,14 +63,14 @@ AnnotatePhenotypeConfig = builds(
     annotate_phenotype,
     source_dataset_rids=["A9-D272"],
     source_version="0.3.0",
-    include_tables=["file", "biosample"],
+    include_tables=["file", "biosample", "genotype"],
     element_table="file",
     exclude_tables=["experiment"],
     feature_table="file",
     feature_name="Phenotype",
     term_column="Phenotype_Type",
-    genotype_column="biosample_Genotype",
-    rid_column="file_RID",
+    genotype_column="vocab.genotype.name",
+    rid_column="isa.file.RID",
     zen_partial=True,
 )
 script_store(AnnotatePhenotypeConfig, name="annotate_phenotype")

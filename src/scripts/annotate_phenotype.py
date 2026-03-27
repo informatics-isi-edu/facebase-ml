@@ -1,17 +1,20 @@
 """Annotate file records with Phenotype feature based on biosample genotype.
 
-Joins file → biosample to read the Genotype field, then classifies each file as:
-- WildType: genotype contains "+/+" or "wild-type" or "wt"
-- Unknown: genotype is null, empty, or contains "NA" suffix
+Joins file → biosample → genotype to read the genotype name, then classifies
+each file as:
+- WildType: genotype name contains "+/+" or matches "WT"/"Wt"/"Wild type"
+- Unknown: genotype name ends with "NA" suffix, or is null/empty
 - Mutated: everything else (knockouts, floxed alleles, insertions, etc.)
 
-Verified DerivaML API signatures:
+Requires the Phenotype feature and Phenotype_Type vocabulary to exist in the
+catalog (create them via MCP tools before running this script).
+
+DerivaML API calls used:
 - ml.feature_record_class(table_name, feature_name) → FeatureRecord subclass
 - ml.lookup_dataset(rid) → Dataset
-- dataset.list_dataset_members(version=...) → {table_name: [{RID, ...}]}
-- dataset.download_dataset_bag(version=..., materialize=False) → DatasetBag
+- dataset.download_dataset_bag(version, materialize=False) → DatasetBag
 - bag.denormalize_as_dataframe(include_tables) → pd.DataFrame
-- exe.add_features(records: list[FeatureRecord]) → None
+- execution.add_features(records: list[FeatureRecord]) → None
 
 Run via:
     uv run deriva-ml-run +experiment=annotate_phenotype_e155 dry_run=true
@@ -26,19 +29,21 @@ from deriva_ml import DerivaML
 from deriva_ml.execution import Execution
 
 
-def classify_genotype(genotype: str | None) -> str:
-    """Classify a genotype string into WildType, Mutated, or Unknown.
+def classify_genotype(genotype_name: str | None) -> str:
+    """Classify a genotype name into WildType, Mutated, or Unknown.
 
     Rules:
     - None/empty → Unknown
-    - Contains "+/+" or "wild-type" or "wild type" or ends with "wt" → WildType
-    - Ends with "NA" (null allele indicator) → Unknown
-    - Everything else → Mutated
+    - Contains "+/+" → WildType (e.g., "Tfap2a+/+", "Nosip+/+", "Six1+/+")
+    - Case-insensitive match for "wild type", "wild-type", "Wt", "WT" → WildType
+    - Equals "Control" → WildType
+    - Ends with "NA" (null allele indicator) → Unknown (e.g., "Tfap2aNA", "Fgf8NA")
+    - Everything else → Mutated (e.g., "Tfap2afl/-", "Nosip-/-", "Cc2d2a-/-")
     """
-    if not genotype or not genotype.strip():
+    if not genotype_name or not genotype_name.strip():
         return "Unknown"
 
-    g = genotype.strip()
+    g = genotype_name.strip()
 
     # WildType patterns
     if "+/+" in g:
@@ -47,9 +52,11 @@ def classify_genotype(genotype: str | None) -> str:
         return "WildType"
     if re.search(r"\bwt\b", g, re.IGNORECASE):
         return "WildType"
+    if g.lower() == "control":
+        return "WildType"
 
     # Unknown patterns — null allele suffix "NA"
-    if g.upper().endswith("NA"):
+    if g.endswith("NA"):
         return "Unknown"
 
     # Everything else is Mutated
@@ -60,7 +67,7 @@ def annotate_phenotype(
     # Source dataset
     source_dataset_rids: list[str] | None = None,
     source_version: str | None = None,
-    # Denormalization
+    # Denormalization — must include genotype table to get name
     include_tables: list[str] | None = None,
     exclude_tables: list[str] | None = None,
     element_table: str = "file",
@@ -68,18 +75,21 @@ def annotate_phenotype(
     feature_table: str = "file",
     feature_name: str = "Phenotype",
     term_column: str = "Phenotype_Type",
-    # Genotype column in denormalized DataFrame
-    genotype_column: str = "biosample_Genotype",
-    rid_column: str = "file_RID",
+    # Column names in the denormalized DataFrame
+    # With 3 tables (file, biosample, genotype), columns are schema-qualified:
+    #   isa.file.RID, vocab.genotype.name
+    genotype_column: str = "vocab.genotype.name",
+    rid_column: str = "isa.file.RID",
     # DerivaML integration (injected by framework)
     ml_instance: DerivaML | None = None,
     execution: Execution | None = None,
 ) -> None:
     """Annotate file records with Phenotype feature based on biosample genotype.
 
-    Downloads a metadata-only bag, denormalizes file + biosample tables,
-    classifies each file's genotype into WildType/Mutated/Unknown, and
-    writes the Phenotype feature values with provenance tracking.
+    Downloads a metadata-only bag, denormalizes file + biosample + genotype
+    tables to resolve genotype names, classifies each file's genotype into
+    WildType/Mutated/Unknown, and writes the Phenotype feature values with
+    provenance tracking.
     """
     if ml_instance is None:
         raise ValueError(
@@ -88,7 +98,8 @@ def annotate_phenotype(
         )
 
     source_dataset_rids = source_dataset_rids or []
-    include_tables = include_tables or ["file", "biosample"]
+    include_tables = include_tables or ["file", "biosample", "genotype"]
+    exclude_tables = exclude_tables or []
 
     if not source_dataset_rids:
         raise ValueError(
@@ -100,7 +111,7 @@ def annotate_phenotype(
 
     # Collect all file RIDs and their genotype classifications
     feature_records = []
-    stats = {"WildType": 0, "Mutated": 0, "Unknown": 0}
+    stats: dict[str, int] = {"WildType": 0, "Mutated": 0, "Unknown": 0}
 
     for rid in source_dataset_rids:
         dataset = ml_instance.lookup_dataset(rid)
@@ -115,25 +126,27 @@ def annotate_phenotype(
         df = bag.denormalize_as_dataframe(include_tables)
         print(f"  Denormalized: {len(df)} rows, {len(df.columns)} columns")
 
-        # Check that required columns exist
+        # Verify required columns exist
         if genotype_column not in df.columns:
-            available = [c for c in df.columns if "genotype" in c.lower() or "geno" in c.lower()]
+            available = [c for c in df.columns if "genotype" in c.lower()]
             raise ValueError(
-                f"Column '{genotype_column}' not found in denormalized DataFrame. "
-                f"Available columns with 'genotype': {available}. "
-                f"All columns: {list(df.columns)}"
+                f"Column '{genotype_column}' not found. "
+                f"Genotype-related columns: {available}. "
+                f"Make sure include_tables contains 'genotype' (not just 'biosample')."
             )
         if rid_column not in df.columns:
             available = [c for c in df.columns if "rid" in c.lower()]
             raise ValueError(
-                f"Column '{rid_column}' not found in denormalized DataFrame. "
-                f"Available RID columns: {available}."
+                f"Column '{rid_column}' not found. "
+                f"RID columns: {available}."
             )
+
+        print(f"  Using: rid={rid_column}, genotype={genotype_column}")
 
         for _, row in df.iterrows():
             file_rid = row[rid_column]
-            genotype = row.get(genotype_column)
-            phenotype = classify_genotype(genotype)
+            genotype_name = row.get(genotype_column)
+            phenotype = classify_genotype(genotype_name)
             stats[phenotype] += 1
 
             record = PhenotypeFeature(**{
