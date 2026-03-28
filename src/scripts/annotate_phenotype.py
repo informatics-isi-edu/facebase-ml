@@ -33,11 +33,25 @@ from deriva_ml import DerivaML
 from deriva_ml.execution import Execution
 
 
+
+# Known wild-type inbred strain names (case-insensitive match).
+# These are standard reference strains used as controls in IMPC and other
+# mouse phenotyping consortia. They don't follow the Gene+/+ naming convention
+# but are wild-type for phenotyping purposes.
+WILDTYPE_STRAIN_NAMES = {
+    "c57bl/6n",     # IMPC reference strain
+    "c57bl/6j",     # Jackson Labs reference strain
+    "c57bl/6",      # Generic C57 black 6
+    "ab",           # Zebrafish wild-type strain
+}
+
+
 def classify_genotype(genotype_name: str | None) -> str:
     """Classify a genotype name into WildType, Mutated, or Unknown.
 
-    Rules:
+    Rules (applied in order):
     - None/empty → Unknown
+    - Known wild-type strain name (C57BL/6N, C57BL/6J, etc.) → WildType
     - Contains "+/+" → WildType (e.g., "Tfap2a+/+", "Nosip+/+", "Six1+/+")
     - Case-insensitive match for "wild type", "wild-type", "Wt", "WT" → WildType
     - Equals "Control" → WildType
@@ -48,6 +62,10 @@ def classify_genotype(genotype_name: str | None) -> str:
         return "Unknown"
 
     g = genotype_name.strip()
+
+    # Check known wild-type strain names first (exact match, case-insensitive)
+    if g.lower() in WILDTYPE_STRAIN_NAMES:
+        return "WildType"
 
     # WildType patterns
     if "+/+" in g:
